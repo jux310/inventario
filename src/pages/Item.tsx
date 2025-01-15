@@ -106,6 +106,7 @@ export function Item({ mode }: ItemProps) {
       videoElement.style.width = '100%';
       videoElement.style.height = '100%';
       videoElement.style.objectFit = 'cover';
+      videoElement.style.transform = 'scaleX(-1)';
       const scanner = new QrScanner(
         videoElement,
         result => {
@@ -128,10 +129,10 @@ export function Item({ mode }: ItemProps) {
       await scanner.start();
 
       const dialog = document.createElement('dialog');
-      dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm';
+      dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/80';
       
       const container = document.createElement('div');
-      container.className = 'bg-white/90 backdrop-blur p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4 relative border border-white/20';
+      container.className = 'bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4 relative';
       
       const header = document.createElement('div');
       header.className = 'flex justify-between items-center mb-6';
@@ -153,9 +154,22 @@ export function Item({ mode }: ItemProps) {
       header.appendChild(closeButton);
       
       const videoContainer = document.createElement('div');
-      videoContainer.className = 'aspect-[3/4] bg-black rounded-xl overflow-hidden shadow-inner border-2 border-white/10 relative';
-      videoContainer.style.minHeight = '400px';
+      videoContainer.className = 'relative bg-black rounded-xl overflow-hidden shadow-inner';
+      videoContainer.style.height = '400px';
+      videoContainer.style.width = '100%';
+      
       videoContainer.appendChild(videoElement);
+      
+      // Add scanning overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'absolute inset-0 pointer-events-none';
+      overlay.innerHTML = `
+        <div class="absolute inset-0 border-2 border-white/40 rounded-xl"></div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="w-48 h-48 border-2 border-white rounded-lg"></div>
+        </div>
+      `;
+      videoContainer.appendChild(overlay);
       
       const instructions = document.createElement('p');
       instructions.className = 'mt-4 text-sm text-gray-600 text-center';

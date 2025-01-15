@@ -204,7 +204,7 @@ export function Stats() {
               <div>
                 <h4 className="font-medium text-gray-900">{record.item_name}</h4>
                 <p className="text-sm text-gray-500">
-                  Última reposición: {formatDistanceToNow(new Date(record.last_restock), { addSuffix: true, locale: es })}
+                  {formatDistanceToNow(new Date(record.last_restock), { addSuffix: true, locale: es })}
                 </p>
               </div>
               {record.days_between_restocks !== null && (
