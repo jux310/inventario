@@ -630,7 +630,7 @@ export function Item({ mode }: ItemProps) {
               {item && item.current_units <= item.restock_point && (
                 <div className="mt-4 p-4 bg-red-50 rounded-md">
                   <p className="text-red-800">
-                    ⚠️ El stock está por debajo del punto de reposición
+                    ⚠️ El stock está bajo
                   </p>
                 </div>
               )}
