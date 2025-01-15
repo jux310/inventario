@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { StatsChart } from '../components/StatsChart';
-import { Package, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, RefreshCw, ChevronRight } from 'lucide-react';
+import { Package, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, RefreshCw, ChevronRight, History } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Item {
   id: string;
@@ -15,12 +17,19 @@ interface HistoryPoint {
   units: number;
 }
 
+interface RestockHistory {
+  item_name: string;
+  last_restock: string;
+  days_between_restocks: number | null;
+}
+
 export function Stats() {
   const [items, setItems] = useState<Item[]>([]);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [expandedSection, setExpandedSection] = useState<'details' | 'restock' | null>(null);
   const [historyData, setHistoryData] = useState<HistoryPoint[]>([]);
   const [lowStockItems, setLowStockItems] = useState<Item[]>([]);
-  const [showDetails, setShowDetails] = useState(false);
+  const [restockHistory, setRestockHistory] = useState<RestockHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,9 +72,70 @@ export function Stats() {
     loadItems();
   }, []);
 
+  useEffect(() => {
+    async function loadRestockHistory() {
+      const { data, error } = await supabase
+        .from('inventory_history')
+        .select(`
+          item_id,
+          created_at,
+          items (
+            name
+          )
+        `)
+        .eq('type', 'add')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading restock history:', error);
+        return;
+      }
+
+      // Process the data to calculate time between restocks
+      const historyByItem = data.reduce((acc: { [key: string]: { dates: string[], name: string } }, record) => {
+        const itemId = record.item_id;
+        if (!acc[itemId]) {
+          acc[itemId] = {
+            dates: [],
+            name: record.items.name
+          };
+        }
+        acc[itemId].dates.push(record.created_at);
+        return acc;
+      }, {});
+
+      const processedHistory = Object.entries(historyByItem).map(([_, info]) => {
+        const sortedDates = info.dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+        const lastRestock = sortedDates[0];
+        
+        // Calculate average days between restocks if there are at least 2 restocks
+        let daysBetweenRestocks = null;
+        if (sortedDates.length >= 2) {
+          const timeDiffs = sortedDates.slice(0, -1).map((date, index) => {
+            const currentDate = new Date(date);
+            const nextDate = new Date(sortedDates[index + 1]);
+            return (currentDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24);
+          });
+          daysBetweenRestocks = Math.round(timeDiffs.reduce((a, b) => a + b, 0) / timeDiffs.length);
+        }
+
+        return {
+          item_name: info.name,
+          last_restock: lastRestock,
+          days_between_restocks: daysBetweenRestocks
+        };
+      });
+
+      setRestockHistory(processedHistory);
+    }
+
+    loadRestockHistory();
+  }, []);
+
   const toggleItemExpansion = async (itemId: string) => {
     if (expandedItemId === itemId) {
       setExpandedItemId(null);
+      setExpandedSection(null);
       return;
     }
 
@@ -121,13 +191,45 @@ export function Stats() {
       </div>
     );
   }
+  
+  const renderRestockHistory = () => (
+    <div className="bg-white shadow rounded-lg mt-4">
+      <div className="p-4 border-b border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900">Historial de Reposiciones</h3>
+      </div>
+      <div className="divide-y divide-gray-200">
+        {restockHistory.map((record, index) => (
+          <div key={index} className="p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h4 className="font-medium text-gray-900">{record.item_name}</h4>
+                <p className="text-sm text-gray-500">
+                  Última reposición: {formatDistanceToNow(new Date(record.last_restock), { addSuffix: true, locale: es })}
+                </p>
+              </div>
+              {record.days_between_restocks !== null && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {record.days_between_restocks} días entre reposiciones
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+        {restockHistory.length === 0 && (
+          <div className="p-4 text-center text-gray-500">
+            No hay historial de reposiciones
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 px-4 py-4">Estadísticas</h1>
 
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 mb-4">
           <div className="bg-white p-4">
             <div className="w-full flex items-center justify-between">
               <div>
@@ -154,9 +256,28 @@ export function Stats() {
             </div>
           </div>
 
+          <div className="bg-white p-4">
+            <button 
+              onClick={() => setExpandedSection(expandedSection === 'restock' ? null : 'restock')}
+              className="w-full h-full flex items-center justify-between">
+              <div className="text-left">
+                <p className="text-sm font-medium text-gray-600">Reposiciones</p>
+                <p className="mt-1 text-3xl font-semibold text-gray-900">{restockHistory.length}</p>
+              </div>
+              <div className="p-3 bg-indigo-50 rounded-lg flex items-center space-x-2">
+                <History className="w-6 h-6 text-indigo-600" />
+                {expandedSection === 'restock' ? (
+                  <ChevronUp className="w-4 h-4 text-indigo-600" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-indigo-600" />
+                )}
+              </div>
+            </button>
+          </div>
+
           <div className="bg-white p-4 relative">
             <button 
-              onClick={() => setShowDetails(!showDetails)}
+              onClick={() => setExpandedSection(expandedSection === 'details' ? null : 'details')}
               className="w-full flex items-center justify-between">
               <div className="text-left">
                 <p className="text-sm font-medium text-gray-600">Necesitan Reposición</p>
@@ -164,7 +285,7 @@ export function Stats() {
               </div>
               <div className="p-3 bg-red-50 rounded-lg flex items-center space-x-2">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
-                {showDetails ? (
+                {expandedSection === 'details' ? (
                   <ChevronUp className="w-4 h-4 text-red-600" />
                 ) : (
                   <ChevronDown className="w-4 h-4 text-red-600" />
@@ -175,7 +296,9 @@ export function Stats() {
         </div>
       )}
 
-      {showDetails && (
+      {expandedSection === 'restock' && renderRestockHistory()}
+
+      {expandedSection === 'details' && (
         <div className="bg-white">
           <div className="border-t border-gray-100">
             {lowStockItems.map((item) => (
