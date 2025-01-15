@@ -3,7 +3,7 @@ import { Plus, Search, QrCode } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ItemCard } from '../components/ItemCard';
-import QrScanner from 'qr-scanner';
+import { QrScannerDialog } from '../components/QrScanner';
 
 export default function Home() {
 interface Item {
@@ -56,104 +56,28 @@ interface Item {
 
   const handleScan = async () => {
     setScanning(true);
+  };
+
+  const handleQrResult = (result: string) => {
     try {
-      const videoElement = document.createElement('video');
-      videoElement.style.width = '100%';
-      videoElement.style.height = '100%';
-      videoElement.style.objectFit = 'cover';
-      videoElement.style.transform = 'scaleX(-1)';
-      const scanner = new QrScanner(
-        videoElement,
-        result => {
-          try {
-            // Check if the result is a valid item URL or just an ID
-            let itemPath;
-            if (result.data.includes('/item/')) {
-              // If it's a full URL, parse it
-              const url = new URL(result.data);
-              itemPath = url.pathname;
-            } else {
-              // If it's just an ID, construct the path
-              itemPath = `/item/${result.data}`;
-            }
+      // Check if the result is a valid item URL or just an ID
+      let itemPath;
+      if (result.includes('/item/')) {
+        // If it's a full URL, parse it
+        const url = new URL(result);
+        itemPath = url.pathname;
+      } else {
+        // If it's just an ID, construct the path
+        itemPath = `/item/${result}`;
+      }
 
-            // Validate that we have a proper item path
-            if (itemPath.startsWith('/item/') && itemPath.length > 6) {
-              scanner.stop();
-              setScanning(false);
-              navigate(itemPath);
-            }
-          } catch (error) {
-            console.error('Invalid QR code data:', error);
-          }
-        },
-        {
-          returnDetailedScanResult: true,
-          highlightScanRegion: true,
-          highlightCodeOutline: true,
-          preferredCamera: 'environment'
-        }
-      );
-
-      await scanner.start();
-
-      const dialog = document.createElement('dialog');
-      dialog.className = 'fixed inset-0 z-50 flex items-center justify-center';
-      
-      const container = document.createElement('div');
-      container.className = 'bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4 relative';
-      
-      const header = document.createElement('div');
-      header.className = 'flex justify-between items-center mb-6';
-      
-      const title = document.createElement('h3');
-      title.className = 'text-xl font-semibold text-gray-900';
-      title.textContent = 'Escanear Código QR';
-      
-      const closeButton = document.createElement('button');
-      closeButton.className = 'text-gray-500 hover:text-gray-700 transition-colors p-1 hover:bg-gray-100 rounded-full';
-      closeButton.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
-      closeButton.onclick = () => {
-        scanner.stop();
-        dialog.remove();
+      // Validate that we have a proper item path
+      if (itemPath.startsWith('/item/') && itemPath.length > 6) {
         setScanning(false);
-      };
-      
-      header.appendChild(title);
-      header.appendChild(closeButton);
-      
-      const videoContainer = document.createElement('div');
-      videoContainer.className = 'relative bg-black rounded-xl overflow-hidden';
-      videoContainer.style.height = '400px';
-      videoContainer.style.width = '100%';
-      
-      // Add scanning overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'absolute inset-0 pointer-events-none';
-      overlay.innerHTML = `
-        <div class="absolute inset-0 border-[3px] border-white/40 rounded-xl"></div>
-        <div class="absolute inset-0 flex items-center justify-center">
-          <div class="w-48 h-48 border-2 border-white rounded-lg"></div>
-        </div>
-      `;
-      videoContainer.appendChild(overlay);
-      videoContainer.appendChild(videoElement);
-      
-      const instructions = document.createElement('p');
-      instructions.className = 'mt-4 text-sm text-gray-600 text-center';
-      instructions.textContent = 'Apunta la cámara al código QR del ítem para escanearlo';
-      
-      container.appendChild(header);
-      container.appendChild(videoContainer);
-      container.appendChild(instructions);
-      dialog.appendChild(container);
-      
-      document.body.appendChild(dialog);
-      dialog.showModal();
+        navigate(itemPath);
+      }
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      setScanning(false);
-      alert('No se pudo acceder a la cámara. Por favor, verifica los permisos.');
+      console.error('Invalid QR code data:', error);
     }
   };
 
@@ -211,6 +135,12 @@ interface Item {
           )}
         </div>
       </div>
+      
+      <QrScannerDialog
+        isOpen={scanning}
+        onClose={() => setScanning(false)}
+        onScan={handleQrResult}
+      />
 
       <Link
         to="/item/new"
