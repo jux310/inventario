@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Package, Plus, Minus, ArrowLeft, Save, Upload, QrCode, Pencil, Download } from 'lucide-react';
+import { Package, Plus, Minus, ArrowLeft, Save, Upload, QrCode, Pencil, Download, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { QrScannerDialog } from '../components/QrScanner';
 import QRCode from 'qrcode';
@@ -33,6 +33,27 @@ export function Item({ mode }: ItemProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [generatingQR, setGeneratingQR] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDeleteItem() {
+    if (!item || !confirm('¿Estás seguro de que quieres mover este ítem a la papelera?')) return;
+    
+    setDeleting(true);
+    const { error } = await supabase
+      .from('items')
+      .update({ deleted: true })
+      .eq('id', item.id);
+
+    if (error) {
+      console.error('Error deleting item:', error);
+      alert('Error al mover el ítem a la papelera. Por favor, intente nuevamente.');
+      setDeleting(false);
+      return;
+    }
+
+    setDeleting(false);
+    navigate('/');
+  }
 
   const handleGenerateQR = async () => {
     if (!item) return;
@@ -448,10 +469,19 @@ export function Item({ mode }: ItemProps) {
               <button
                 type="submit"
                 disabled={uploading}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mr-2"
               >
                 <Save className="h-5 w-5 mr-2" />
                 {uploading ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteItem}
+                disabled={deleting}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <Trash2 className="h-5 w-5 mr-2" />
+                {deleting ? 'Moviendo a papelera...' : 'Mover a papelera'}
               </button>
             </div>
           </form>

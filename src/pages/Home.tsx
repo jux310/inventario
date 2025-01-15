@@ -35,7 +35,8 @@ interface Item {
 
         const { data, error } = await supabase
           .from('items')
-          .select('id, name, description, image_url, current_units, restock_point')
+          .select('id, name, description, image_url, current_units, restock_point, deleted')
+          .eq('deleted', false)
           .order('name');
 
         if (error) {

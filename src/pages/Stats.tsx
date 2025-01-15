@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { StatsChart } from '../components/StatsChart';
-import { Package, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, RefreshCw, ChevronRight, History } from 'lucide-react';
+import { Package, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, RefreshCw, ChevronRight, History, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -26,10 +26,11 @@ interface RestockHistory {
 export function Stats() {
   const [items, setItems] = useState<Item[]>([]);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  const [expandedSection, setExpandedSection] = useState<'details' | 'restock' | null>(null);
+  const [expandedSection, setExpandedSection] = useState<'details' | 'restock' | 'trash' | null>(null);
   const [historyData, setHistoryData] = useState<HistoryPoint[]>([]);
   const [lowStockItems, setLowStockItems] = useState<Item[]>([]);
   const [restockHistory, setRestockHistory] = useState<RestockHistory[]>([]);
+  const [trashedItems, setTrashedItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,6 +56,7 @@ export function Stats() {
       const { data: itemsData, error: itemsError } = await supabase
         .from('items')
         .select('id, name, current_units, restock_point')
+        .eq('deleted', false)
         .order('name');
 
       if (itemsError) {
@@ -69,7 +71,23 @@ export function Stats() {
       setLoading(false);
     }
 
+    async function loadTrashedItems() {
+      const { data: trashedData, error: trashedError } = await supabase
+        .from('items')
+        .select('id, name, current_units, restock_point')
+        .eq('deleted', true)
+        .order('name');
+
+      if (trashedError) {
+        console.error('Error loading trashed items:', trashedError);
+        return;
+      }
+
+      setTrashedItems(trashedData || []);
+    }
+
     loadItems();
+    loadTrashedItems();
   }, []);
 
   useEffect(() => {
@@ -167,6 +185,20 @@ export function Stats() {
     setExpandedItemId(itemId);
   };
 
+  const handleRestoreItem = async (itemId: string) => {
+    const { error } = await supabase
+      .from('items')
+      .update({ deleted: false })
+      .eq('id', itemId);
+
+    if (error) {
+      console.error('Error restoring item:', error);
+      return;
+    }
+
+    // Refresh both lists
+    window.location.reload();
+  };
 
   if (loading) {
     return (
@@ -224,6 +256,39 @@ export function Stats() {
     </div>
   );
 
+  const renderTrashedItems = () => (
+    <div className="bg-white shadow rounded-lg mt-4">
+      <div className="p-4 border-b border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900">Papelera</h3>
+      </div>
+      <div className="divide-y divide-gray-200">
+        {trashedItems.map((item) => (
+          <div key={item.id} className="p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h4 className="font-medium text-gray-900">{item.name}</h4>
+                <p className="text-sm text-gray-500">
+                  {item.current_units} unidades
+                </p>
+              </div>
+              <button
+                onClick={() => handleRestoreItem(item.id)}
+                className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
+              >
+                Restaurar
+              </button>
+            </div>
+          </div>
+        ))}
+        {trashedItems.length === 0 && (
+          <div className="p-4 text-center text-gray-500">
+            No hay ítems en la papelera
+          </div>
+        )}
+      </div>
+    </div>
+  );
+  
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 px-4 py-4">Estadísticas</h1>
@@ -339,6 +404,22 @@ export function Stats() {
           </div>
         </div>
       )}
+
+      <div className="fixed right-4 bottom-24">
+        <button
+          onClick={() => setExpandedSection(expandedSection === 'trash' ? null : 'trash')}
+          className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-600 text-white shadow-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 relative"
+        >
+          <Trash2 className="h-6 w-6" />
+          {trashedItems.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+              {trashedItems.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {expandedSection === 'trash' && renderTrashedItems()}
     </div>
   );
 }
