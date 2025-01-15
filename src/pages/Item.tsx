@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Package, Plus, Minus, ArrowLeft, Save, Upload, QrCode, Pencil } from 'lucide-react';
+import { Package, Plus, Minus, ArrowLeft, Save, Upload, QrCode, Pencil, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QrScanner from 'qr-scanner';
+import QRCode from 'qrcode';
 
 interface Item {
   id: string;
@@ -31,6 +32,72 @@ export function Item({ mode }: ItemProps) {
   const [uploading, setUploading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [generatingQR, setGeneratingQR] = useState(false);
+
+  const handleGenerateQR = async () => {
+    if (!item) return;
+    setGeneratingQR(true);
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error('Could not get canvas context');
+      setGeneratingQR(false);
+      return;
+    }
+
+    try {
+      const url = `https://inventario.anticorr.xyz/item/${item.id}`;
+      const qrDataUrl = await QRCode.toDataURL(url, {
+        width: 1000,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      });
+
+      // Load QR code image
+      const qrImage = new Image();
+      qrImage.src = qrDataUrl;
+      
+      await new Promise((resolve, reject) => {
+        qrImage.onload = resolve;
+        qrImage.onerror = reject;
+      });
+
+      // Set canvas size
+      canvas.width = qrImage.width;
+      canvas.height = qrImage.height + 100; // Extra space for title
+
+      // Fill background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Add title
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 70px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.name, canvas.width / 2, 50);
+
+      // Draw QR code
+      ctx.drawImage(qrImage, 0, 100);
+
+      // Convert to data URL and trigger download
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `qr-${item.name.toLowerCase().replace(/\s+/g, '-')}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      alert('Error al generar el código QR');
+    }
+    setGeneratingQR(false);
+  };
 
   const handleScan = async () => {
     setScanning(true);
@@ -662,14 +729,22 @@ export function Item({ mode }: ItemProps) {
               )}
             </div>
 
-            <div className="mt-6">
-            <button
-              onClick={() => navigate(`/item/${item?.id}/edit`)}
-              className="w-full inline-flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <Pencil className="h-5 w-5 mr-2" />
-              Editar Ítem
-            </button>
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <button
+                onClick={() => navigate(`/item/${item?.id}/edit`)}
+                className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <Pencil className="h-5 w-5 mr-2" />
+                Editar Ítem
+              </button>
+              <button
+                onClick={handleGenerateQR}
+                disabled={generatingQR}
+                className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <Download className="h-5 w-5 mr-2" />
+                {generatingQR ? 'Generando...' : 'Descargar QR'}
+              </button>
             </div>
           </div>
       </div>
