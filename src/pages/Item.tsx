@@ -140,6 +140,17 @@ export function Item({ mode }: ItemProps) {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type and size
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, seleccione un archivo de imagen válido');
+        return;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert('La imagen es demasiado grande. El tamaño máximo es 5MB');
+        return;
+      }
+
       setImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -214,18 +225,16 @@ export function Item({ mode }: ItemProps) {
     if (image) {
       const fileExt = image.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
-      
+      const contentType = image.type || 'image/jpeg';
+
       try {
-        // Convert image to blob
-        const response = await fetch(imagePreview);
-        const blob = await response.blob();
-        
-        // Upload blob to Supabase
+        // Upload file directly without conversion
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('items')
-          .upload(fileName, blob, {
+          .upload(fileName, image, {
             cacheControl: '3600',
-            contentType: image.type
+            contentType: contentType,
+            upsert: false
           });
 
         if (uploadError) {
@@ -297,18 +306,16 @@ export function Item({ mode }: ItemProps) {
     if (image) {
       const fileExt = image.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
-      
+      const contentType = image.type || 'image/jpeg';
+
       try {
-        // Convert image to blob
-        const response = await fetch(imagePreview);
-        const blob = await response.blob();
-        
-        // Upload blob to Supabase
+        // Upload file directly without conversion
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('items')
-          .upload(fileName, blob, {
+          .upload(fileName, image, {
             cacheControl: '3600',
-            contentType: image.type
+            contentType: contentType,
+            upsert: false
           });
 
         if (uploadError) {
