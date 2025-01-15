@@ -140,12 +140,27 @@ export function Item({ mode }: ItemProps) {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Check file type and size
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, seleccione una imagen válida');
+        return;
+      }
+
+      // Limit file size to 5MB
+      if (file.size > 5 * 1024 * 1024) {
+        alert('La imagen es demasiado grande. El tamaño máximo es 5MB');
+        return;
+      }
+
       setImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+      
+      // Reset the input value to allow selecting the same file again
+      e.target.value = '';
     }
   };
 
@@ -436,8 +451,9 @@ export function Item({ mode }: ItemProps) {
                     <input
                       type="file"
                       id="image"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/heic,image/heif"
                       onChange={handleImageChange}
+                      capture="environment"
                       className="sr-only"
                     />
                     <label
@@ -556,8 +572,9 @@ export function Item({ mode }: ItemProps) {
                     <input
                       type="file"
                       id="image"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/heic,image/heif"
                       onChange={handleImageChange}
+                      capture="environment"
                       className="sr-only"
                     />
                     <label
