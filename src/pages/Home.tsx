@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { ItemCard } from '../components/ItemCard';
 import QrScanner from 'qr-scanner';
 
+export default function Home() {
 interface Item {
   id: string;
   name: string;
@@ -14,7 +15,6 @@ interface Item {
   restock_point: number;
 }
 
-export function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -28,17 +28,26 @@ export function Home() {
 
   useEffect(() => {
     async function loadItems() {
-      const { data, error } = await supabase
-        .from('items')
-        .select('id, name, description, image_url, current_units, restock_point')
-        .order('name');
+      try {
+        if (!supabase) {
+          throw new Error('Supabase client not initialized');
+        }
 
-      if (error) {
-        console.error('Error loading items:', error);
-        return;
+        const { data, error } = await supabase
+          .from('items')
+          .select('id, name, description, image_url, current_units, restock_point')
+          .order('name');
+
+        if (error) {
+          throw error;
+        }
+
+        setItems(data || []);
+      } catch (error) {
+        console.error('Error loading items:', error instanceof Error ? error.message : error);
+        // Set empty array to prevent undefined items
+        setItems([]);
       }
-
-      setItems(data);
       setLoading(false);
     }
 
@@ -49,6 +58,9 @@ export function Home() {
     setScanning(true);
     try {
       const videoElement = document.createElement('video');
+      videoElement.style.width = '100%';
+      videoElement.style.height = '100%';
+      videoElement.style.objectFit = 'cover';
       const scanner = new QrScanner(
         videoElement,
         result => {
@@ -64,27 +76,28 @@ export function Home() {
           returnDetailedScanResult: true,
           highlightScanRegion: true,
           highlightCodeOutline: true,
+          preferredCamera: 'environment'
         }
       );
 
       await scanner.start();
 
       const dialog = document.createElement('dialog');
-      dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+      dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm';
       
       const container = document.createElement('div');
-      container.className = 'bg-white p-4 rounded-lg shadow-lg max-w-sm w-full mx-4';
+      container.className = 'bg-white/90 backdrop-blur p-6 rounded-2xl shadow-2xl w-full max-w-md mx-4 relative border border-white/20';
       
       const header = document.createElement('div');
-      header.className = 'flex justify-between items-center mb-4';
+      header.className = 'flex justify-between items-center mb-6';
       
       const title = document.createElement('h3');
-      title.className = 'text-lg font-medium';
+      title.className = 'text-xl font-semibold text-gray-900';
       title.textContent = 'Escanear Código QR';
       
       const closeButton = document.createElement('button');
-      closeButton.className = 'text-gray-500 hover:text-gray-700';
-      closeButton.innerHTML = '&times;';
+      closeButton.className = 'text-gray-500 hover:text-gray-700 transition-colors p-1 hover:bg-gray-100 rounded-full';
+      closeButton.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
       closeButton.onclick = () => {
         scanner.stop();
         dialog.remove();
@@ -95,11 +108,17 @@ export function Home() {
       header.appendChild(closeButton);
       
       const videoContainer = document.createElement('div');
-      videoContainer.className = 'aspect-square bg-black rounded-lg overflow-hidden';
+      videoContainer.className = 'aspect-[3/4] bg-black rounded-xl overflow-hidden shadow-inner border-2 border-white/10 relative';
+      videoContainer.style.minHeight = '400px';
       videoContainer.appendChild(videoElement);
+      
+      const instructions = document.createElement('p');
+      instructions.className = 'mt-4 text-sm text-gray-600 text-center';
+      instructions.textContent = 'Apunta la cámara al código QR del ítem para escanearlo';
       
       container.appendChild(header);
       container.appendChild(videoContainer);
+      container.appendChild(instructions);
       dialog.appendChild(container);
       
       document.body.appendChild(dialog);
