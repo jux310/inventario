@@ -185,6 +185,7 @@ export function Item({ mode }: ItemProps) {
   async function handleUpdateItem(e: React.FormEvent) {
     e.preventDefault();
     if (!item) return;
+    setUploading(true);
 
     // Check if name was changed and if so, check for duplicates
     if (name.trim() !== item.name) {
@@ -196,37 +197,55 @@ export function Item({ mode }: ItemProps) {
         .limit(1);
 
       if (checkError) {
+        setUploading(false);
         console.error('Error checking existing items:', checkError);
         return;
       }
 
       if (existingItems && existingItems.length > 0) {
+        setUploading(false);
         alert('Ya existe un ítem con este nombre. Por favor, use un nombre diferente.');
         return;
       }
     }
 
-    setUploading(true);
     let imageUrl = item.image_url;
 
     if (image) {
       const fileExt = image.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('items')
-        .upload(fileName, image);
+      
+      try {
+        // Convert image to blob
+        const response = await fetch(imagePreview);
+        const blob = await response.blob();
+        
+        // Upload blob to Supabase
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('items')
+          .upload(fileName, blob, {
+            cacheControl: '3600',
+            contentType: image.type
+          });
 
-      if (uploadError) {
-        console.error('Error uploading image:', uploadError);
+        if (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          alert('Error al subir la imagen. Por favor, intente nuevamente.');
+          setUploading(false);
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('items')
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrl;
+      } catch (error) {
+        console.error('Error processing image:', error);
+        alert('Error al procesar la imagen. Por favor, intente nuevamente.');
         setUploading(false);
         return;
       }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('items')
-        .getPublicUrl(fileName);
-
-      imageUrl = publicUrl;
     }
 
     const { error } = await supabase
@@ -252,6 +271,7 @@ export function Item({ mode }: ItemProps) {
 
   async function handleCreateItem(e: React.FormEvent) {
     e.preventDefault();
+    setUploading(true);
     
     // Check if an item with the same name already exists
     const { data: existingItems, error: checkError } = await supabase
@@ -261,36 +281,54 @@ export function Item({ mode }: ItemProps) {
       .limit(1);
 
     if (checkError) {
+      setUploading(false);
       console.error('Error checking existing items:', checkError);
       return;
     }
 
     if (existingItems && existingItems.length > 0) {
+      setUploading(false);
       alert('Ya existe un ítem con este nombre. Por favor, use un nombre diferente.');
       return;
     }
 
-    setUploading(true);
     let imageUrl = '';
 
     if (image) {
       const fileExt = image.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('items')
-        .upload(fileName, image);
+      
+      try {
+        // Convert image to blob
+        const response = await fetch(imagePreview);
+        const blob = await response.blob();
+        
+        // Upload blob to Supabase
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('items')
+          .upload(fileName, blob, {
+            cacheControl: '3600',
+            contentType: image.type
+          });
 
-      if (uploadError) {
-        console.error('Error uploading image:', uploadError);
+        if (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          alert('Error al subir la imagen. Por favor, intente nuevamente.');
+          setUploading(false);
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('items')
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrl;
+      } catch (error) {
+        console.error('Error processing image:', error);
+        alert('Error al procesar la imagen. Por favor, intente nuevamente.');
         setUploading(false);
         return;
       }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('items')
-        .getPublicUrl(fileName);
-
-      imageUrl = publicUrl;
     }
 
     const { data, error } = await supabase
